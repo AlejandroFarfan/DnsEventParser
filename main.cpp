@@ -4,6 +4,8 @@
 //
 
 #include <iostream>
+#include <sstream>
+
 #include <Windows.h>
 #include <wchar.h>
 #include <tchar.h>
@@ -44,24 +46,34 @@ void cleanup(EVT_HANDLE hRes)
     }
 }
 
-void reader(void)
+void reader(int secondsReadEvent)
 {
     DWORD status = ERROR_SUCCESS;
     EVT_HANDLE hResults = NULL;
 
-    hResults = EvtSubscribe(NULL, NULL, L"Microsoft-Windows-Sysmon/Operational", L"Event/System[EventID=22]", NULL, NULL, (EVT_SUBSCRIBE_CALLBACK)SubscriptionCallback, EvtSubscribeStartAtOldestRecord);
+    int theNumber = 1000*secondsReadEvent;
+    wostringstream s;
+    s << L"Event/System[(EventID=22) and (TimeCreated[timediff(@SystemTime) <= " << theNumber<<"])]";
+    wstring str = s.str();
+    vector<wchar_t> buf(str.begin(), str.end());
+    buf.push_back(0);
+
+    hResults = EvtSubscribe(NULL, NULL, L"Microsoft-Windows-Sysmon/Operational",
+                            &buf[0], NULL, NULL, (EVT_SUBSCRIBE_CALLBACK)SubscriptionCallback, EvtSubscribeStartAtOldestRecord);
+                    //    "Event/System[EventID=22]"
+    //L"Event/System[(EventID=22) and (TimeCreated[timediff(@SystemTime) <= 3600000])]"
     if (NULL == hResults)
     {
         status = GetLastError();
 
         if (ERROR_EVT_CHANNEL_NOT_FOUND == status)
-            wprintf(L"The channel was not found.\n");
+            qDebug("The channel was not found.\n");
         else if (ERROR_EVT_INVALID_QUERY == status)
             // You can call the EvtGetExtendedStatus function to try to get
             // additional information as to what is wrong with the query.
-            wprintf(L"The query is not valid.\n");
+            qDebug("The query is not valid.\n");
         else
-            wprintf(L"EvtQuery failed with %lu.\n", status);
+            qDebug("EvtQuery failed with %lu.\n", status);
 
         cleanup(hResults);
     }
@@ -82,35 +94,31 @@ DWORD WINAPI SubscriptionCallback(EVT_SUBSCRIBE_NOTIFY_ACTION action, PVOID pCon
     case EvtSubscribeActionError:
         if (ERROR_EVT_QUERY_RESULT_STALE == (DWORD)hEvent)
         {
-            wprintf(L"The subscription callback was notified that event records are missing.\n");
-            // Handle if this is an issue for your application.
+            qDebug("The subscription callback was notified that event records are missing.\n");
         }
         else
         {
-            wprintf(L"The subscription callback received the following Win32 error: %lu\n", (DWORD)hEvent);
+            qDebug("The subscription callback received the following Win32 error: %lu\n", (DWORD)hEvent);
         }
         break;
 
     case EvtSubscribeActionDeliver:
         if (ERROR_SUCCESS != (status = PrintEvent(hEvent)))
         {
-            goto cleanup;
+            if (ERROR_SUCCESS != status)
+            {
+                // End subscription - Use some kind of IPC mechanism to signal
+                // your application to close the subscription handle.
+            }
+
+
         }
         break;
 
     default:
-        wprintf(L"SubscriptionCallback: Unknown action.\n");
+        qDebug("SubscriptionCallback: Unknown action.");
     }
-
-cleanup:
-
-    if (ERROR_SUCCESS != status)
-    {
-        // End subscription - Use some kind of IPC mechanism to signal
-        // your application to close the subscription handle.
-    }
-
-    return status; // The service ignores the returned status.
+    return status;
 }
 
 
@@ -134,7 +142,7 @@ DWORD PrintEvent(EVT_HANDLE hEvent)
             }
             else
             {
-                wprintf(L"malloc failed\n");
+                qDebug("malloc failed");
                 status = ERROR_OUTOFMEMORY;
                 cleanup(pRenderedContent);
             }
@@ -142,7 +150,7 @@ DWORD PrintEvent(EVT_HANDLE hEvent)
 
         if (ERROR_SUCCESS != (status = GetLastError()))
         {
-            wprintf(L"EvtRender failed with %d\n", status);
+            qDebug("EvtRender failed with %d", status);
             cleanup(pRenderedContent);
         }
     }
@@ -159,7 +167,12 @@ DWORD PrintEvent(EVT_HANDLE hEvent)
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    reader();
+    if(argc!=2){
+        qDebug()<<"Not enough parameters to run";
+        return -1;
+    }
+    QString secondsInput = argv[1];
+    reader(secondsInput.toInt());
     XmlParser parser;
     parser.setEventList(eventList);
     return 0;

@@ -47,6 +47,7 @@ QPair<QString, int > XmlParser::getDnsDataFromXml(QString xml)
     QPair<QString, int> dnsQuery;
     dnsQuery.second=0;
     QXmlStreamReader reader(xml);
+//    QDateTime date;
     while(!reader.atEnd())
     {
         reader.readNext();
@@ -69,7 +70,10 @@ QPair<QString, int > XmlParser::getDnsDataFromXml(QString xml)
                 }else if (attrs.value("Name").toString()=="ProcessId") {
                     attrs.value("Name").toString();
                     dnsQuery.second= reader.readElementText().toInt();
+                }else if (attrs.value("Name").toString()=="UtcTime") {
+
                 }
+
             }
             continue;
         }
