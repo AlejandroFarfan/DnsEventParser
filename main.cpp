@@ -11,14 +11,17 @@
 #include <sddl.h>
 #include <stdio.h>
 #include <winevt.h>
-#include <QString>
+#include <QStringList>
 #include "xmlparser.h"
+#include <QDebug>
 
 #pragma comment(lib, "wevtapi.lib")
 
 const int SIZE_DATA = 4096;
 TCHAR XMLDataCurrent[SIZE_DATA];
 TCHAR XMLDataUser[SIZE_DATA];
+
+QStringList eventList;
 
 #define ARRAY_SIZE 10
 #define TIMEOUT 1000  // 1 second; Set and use in place of INFINITE in EvtNext call
@@ -34,15 +37,18 @@ void cleanup(LPWSTR pRender)
     }
 }
 
+void cleanup(EVT_HANDLE hRes)
+{
+    if (hRes){
+        EvtClose(hRes);
+    }
+}
+
 void reader(void)
 {
     DWORD status = ERROR_SUCCESS;
     EVT_HANDLE hResults = NULL;
-    //LPWSTR pwsPath = _T("Microsoft-Windows-TerminalServices-LocalSessionManager/Operational");
-    //LPWSTR pwsQuery = L"Event/System[EventID=22]";
 
-    //hResults = EvtQuery(NULL, pwsPath, pwsQuery, EvtQueryChannelPath );// EvtQueryReverseDirection);
-    //hResults = EvtSubscribe(NULL, NULL, L"Microsoft-Windows-Sysmon/Operational", L"Event/System[EventID=22]", NULL, NULL, (EVT_SUBSCRIBE_CALLBACK)SubscriptionCallback, EvtSubscribeStartAtOldestRecord);
     hResults = EvtSubscribe(NULL, NULL, L"Microsoft-Windows-Sysmon/Operational", L"Event/System[EventID=22]", NULL, NULL, (EVT_SUBSCRIBE_CALLBACK)SubscriptionCallback, EvtSubscribeStartAtOldestRecord);
     if (NULL == hResults)
     {
@@ -57,14 +63,9 @@ void reader(void)
         else
             wprintf(L"EvtQuery failed with %lu.\n", status);
 
-        goto cleanup;
+        cleanup(hResults);
     }
     Sleep(1000);
-
-cleanup:
-
-    if (hResults)
-        EvtClose(hResults);
 
 }
 // The callback that receives the events that match the query criteria.
@@ -148,9 +149,8 @@ DWORD PrintEvent(EVT_HANDLE hEvent)
 
     ZeroMemory(XMLDataCurrent, SIZE_DATA);
     lstrcpyW((LPWSTR)XMLDataCurrent, pRenderedContent);
-    QString convertedStr = QString::fromLocal8Bit((const char *)XMLDataCurrent);
-
-    wprintf(L"EvtRender data %s\n", XMLDataCurrent);
+    QString convertedStr = QString::fromWCharArray(XMLDataCurrent);
+    eventList.append(convertedStr);
 
     return status;
 }
@@ -160,5 +160,7 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
     reader();
-    return a.exec();
+    XmlParser parser;
+    parser.setEventList(eventList);
+    return 0;
 }
