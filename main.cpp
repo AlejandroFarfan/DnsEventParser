@@ -60,8 +60,6 @@ void reader(int secondsReadEvent)
 
     hResults = EvtSubscribe(NULL, NULL, L"Microsoft-Windows-Sysmon/Operational",
                             &buf[0], NULL, NULL, (EVT_SUBSCRIBE_CALLBACK)SubscriptionCallback, EvtSubscribeStartAtOldestRecord);
-                    //    "Event/System[EventID=22]"
-    //L"Event/System[(EventID=22) and (TimeCreated[timediff(@SystemTime) <= 3600000])]"
     if (NULL == hResults)
     {
         status = GetLastError();
@@ -86,38 +84,30 @@ DWORD WINAPI SubscriptionCallback(EVT_SUBSCRIBE_NOTIFY_ACTION action, PVOID pCon
     UNREFERENCED_PARAMETER(pContext);
 
     DWORD status = ERROR_SUCCESS;
-
     switch (action)
     {
-        // You should only get the EvtSubscribeActionError action if your subscription flags
-        // includes EvtSubscribeStrict and the channel contains missing event records.
     case EvtSubscribeActionError:
         if (ERROR_EVT_QUERY_RESULT_STALE == (DWORD)hEvent)
         {
-            qDebug("The subscription callback was notified that event records are missing.\n");
+            qDebug("The subscription callback was notified that event records are missing.");
         }
         else
         {
-            qDebug("The subscription callback received the following Win32 error: %lu\n", (DWORD)hEvent);
+            qDebug("The subscription callback received the following Win32 error: %lu", (DWORD)hEvent);
         }
         break;
 
     case EvtSubscribeActionDeliver:
         if (ERROR_SUCCESS != (status = PrintEvent(hEvent)))
         {
-            if (ERROR_SUCCESS != status)
-            {
-                // End subscription - Use some kind of IPC mechanism to signal
-                // your application to close the subscription handle.
-            }
-
-
+            qDebug("End subscription");
         }
         break;
 
     default:
         qDebug("SubscriptionCallback: Unknown action.");
     }
+
     return status;
 }
 
@@ -172,7 +162,13 @@ int main(int argc, char *argv[])
         return -1;
     }
     QString secondsInput = argv[1];
-    reader(secondsInput.toInt());
+    bool parse;
+    int seconds = secondsInput.toInt(&parse);
+    if(!parse){
+        qDebug()<<"input data "<<secondsInput<<" is not a valid number";
+        return -1;
+    }
+    reader(seconds);
     XmlParser parser;
     parser.setEventList(eventList);
     return 0;

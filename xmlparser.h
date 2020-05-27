@@ -23,6 +23,7 @@ public:
     XmlParser();
     QPair<QString, int> getDnsDataFromXml(QString xml);
     void setEventList(QStringList xml);
+    ~XmlParser();
 
 private:
     QHash<QString, DnsMetaData*> dnsData;

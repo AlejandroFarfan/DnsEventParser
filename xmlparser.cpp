@@ -5,7 +5,12 @@
 
 XmlParser::XmlParser()
 {
+    dnsData.clear();
+}
 
+XmlParser::~XmlParser()
+{
+   dnsData.clear();
 }
 
 void XmlParser::setEventList(QStringList xml)
@@ -43,11 +48,9 @@ QHash<QString , int> XmlParser::parsingQueryToRead(QHash<QString, DnsMetaData*> 
 
 QPair<QString, int > XmlParser::getDnsDataFromXml(QString xml)
 {
-//    qDebug()<<"+*+*+*+* "<< xml;
     QPair<QString, int> dnsQuery;
     dnsQuery.second=0;
     QXmlStreamReader reader(xml);
-//    QDateTime date;
     while(!reader.atEnd())
     {
         reader.readNext();
@@ -70,8 +73,6 @@ QPair<QString, int > XmlParser::getDnsDataFromXml(QString xml)
                 }else if (attrs.value("Name").toString()=="ProcessId") {
                     attrs.value("Name").toString();
                     dnsQuery.second= reader.readElementText().toInt();
-                }else if (attrs.value("Name").toString()=="UtcTime") {
-
                 }
 
             }
@@ -91,12 +92,11 @@ QList<QPair<int, QString>> XmlParser::ordering(QHash<QString , int> result)
         i.next();
         inv.append(QPair<int, QString>(i.value(), i.key()));
     }
-    std::sort(std::begin(inv), std::end(inv));
-    int count = 0;
-    for (int j = inv.size()-1; j>=0;--j) {
+    qSort(inv.begin(), inv.end(),qGreater<QPair<int, QString>>());
+
+    for (int j = 0; j<inv.size();++j) {
         qDebug() << "Domain: "<<inv.at(j).second << "Queries "<<inv.at(j).first;
-        count++;
-        if(count==10){
+        if(j==9){
             break;
         }
     }
